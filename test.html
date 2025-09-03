@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Genitalia RPG — Prototype</title>
+<style>
+  :root{
+    --bg:#0b0b0d; --card:#0f1114; --muted:#9aa0a6; --accent:#ff6a86; --glass: rgba(255,255,255,0.03);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
+  body{background:linear-gradient(180deg,#06070a 0%, #0b0b0d 70%);color:#e9eef6;display:flex;align-items:flex-start;justify-content:center;padding:18px;}
+  .container{width:1100px;max-width:98vw;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px;padding:16px;display:grid;grid-template-columns:1fr 360px;gap:14px;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+  header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  h1{color:var(--accent);font-size:18px;margin:0}
+  .sub{color:var(--muted);font-size:13px}
+  /* MAIN GAME AREA */
+  .stage{background:linear-gradient(180deg,#07111a 0%, #051017 100%);border-radius:10px;padding:14px;min-height:620px;display:flex;flex-direction:column;gap:10px}
+  .viewport{flex:1;border-radius:8px;background:linear-gradient(180deg,#0b2530 0%, #07202a 100%);position:relative;overflow:hidden;border:1px solid rgba(255,255,255,0.03)}
+  /* stylized shaft + balls container */
+  .dick {
+    position:absolute; left:88px; top:110px; transform-origin:center top;
+    display:flex; flex-direction:column; align-items:center; gap:6px; touch-action:none;
+  }
+  .shaft {
+    width:40px; height:160px; border-radius:999px; background:linear-gradient(180deg,#ffb7c9,#ff6a86);
+    position:relative; box-shadow: inset 0 -8px 20px rgba(0,0,0,0.12);
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  .head {
+    width:48px; height:48px; border-radius:50%; background:linear-gradient(180deg,#ff8ea6,#ff6a86);
+    margin-top:-18px; box-shadow:0 8px 14px rgba(0,0,0,0.08);
+  }
+  .balls {
+    display:flex; gap:12px; margin-top:6px; align-items:center;
+  }
+  .ball {
+    width:36px; height:36px; border-radius:50%; background:linear-gradient(180deg,#ffc7d4,#ff8aa8);
+    box-shadow:0 6px 10px rgba(0,0,0,0.25); transform-origin:center;
+  }
+
+  /* Panels */
+  .panel{background:var(--card);border-radius:10px;padding:12px}
+  aside .panel{position:sticky;top:18px}
+  label{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}
+  .row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+  input[type=range]{width:100%}
+  button{background:var(--accent);border:none;color:#071018;padding:8px 10px;border-radius:8px;font-weight:700;cursor:pointer}
+  .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:8px 10px;border-radius:8px;cursor:pointer}
+  .skin-option{display:inline-block;padding:8px;border-radius:8px;margin:6px 6px 0 0;cursor:pointer;border:1px solid rgba(255,255,255,0.03)}
+  .muted{color:var(--muted);font-size:13px}
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:13px}
+  .meter{height:10px;background:rgba(255,255,255,0.06);border-radius:6px;overflow:hidden}
+  .meter > i{display:block;height:100%;background:linear-gradient(90deg,#ffd6e0,#ff7b9a)}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .ability{padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--muted);cursor:pointer}
+  .ability.active{border-color:rgba(255,255,255,0.08);color:#fff}
+  .toast{position:absolute;left:16px;top:12px;padding:8px 10px;border-radius:8px;background:rgba(0,0,0,0.55);color:#fff;font-weight:700}
+  footer{grid-column:1/-1;text-align:right;color:var(--muted);font-size:12px;margin-top:6px}
+
+  /* skins */
+  .skin-default .shaft{background:linear-gradient(180deg,#ffb7c9,#ff6a86)}
+  .skin-gold .shaft{background:linear-gradient(180deg,#ffe39a,#ffd14d)}
+  .skin-disco .shaft{background:linear-gradient(45deg,#ff6a86,#6a9bff,#7dff95)}
+  .skin-steel .shaft{background:linear-gradient(180deg,#c7cdd4,#9aa3ad)}
+  /* rigid style */
+  .rigid .shaft{border-radius:6px}
+  .rigid .head{border-radius:6px}
+  /* whip animation added/removed by js */
+
+  /* small helpers */
+  .flex{display:flex;gap:8px;align-items:center}
+  .center{display:flex;align-items:center;justify-content:center}
+  .label-pill{background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:999px;font-weight:700}
+  .danger{color:#ff9aa2}
+  .small{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+  <div class="container" role="application" aria-label="Genitalia RPG Prototype">
+    <header>
+      <div>
+        <h1>Genitalia RPG — Prototype</h1>
+        <div class="sub">Balls, sliders, abilities, and poor life choices. 18+ only.</div>
+      </div>
+      <div class="sub">Sass enabled. Play responsibly.</div>
+    </header>
+
+    <main class="stage panel">
+      <div class="viewport" id="viewport">
+        <div id="toast" class="toast" style="display:none">Toast</div>
+
+        <!-- DYNAMIC: dick element -->
+        <div id="dick" class="dick skin-default" tabindex="0" aria-label="The object of the game">
+          <div id="shaft" class="shaft" role="img" aria-label="Shaft">
+            <div id="head" class="head"></div>
+          </div>
+          <div class="balls" id="balls">
+            <div id="leftBall" class="ball"></div>
+            <div id="rightBall" class="ball"></div>
+          </div>
+        </div>
+
+        <!-- simple obstacles for demonstration -->
+        <div id="platform" style="position:absolute;right:28px;bottom:86px;width:160px;height:16px;background:rgba(255,255,255,0.03);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px">Try rigid mode</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+        <div class="small muted">Drag the object to reposition. Use powerups and abilities to interact.</div>
+        <div class="small muted">Controls: Buttons only (no keyboard required)</div>
+      </div>
+    </main>
+
+    <aside class="panel">
+      <label><input type="checkbox" id="ageConfirm"/> I confirm I am 18+ (enable controls)</label>
+
+      <div style="margin-top:12px">
+        <label>Length: <span id="lenVal" class="muted">160px</span></label>
+        <input id="lengthSlider" type="range" min="80" max="360" value="160">
+      </div>
+
+      <div style="margin-top:8px">
+        <label>Girth: <span id="girthVal" class="muted">40px</span></label>
+        <input id="girthSlider" type="range" min="20" max="140" value="40">
+      </div>
+
+      <div style="margin-top:8px">
+        <label>Ball size: <span id="ballVal" class="muted">36px</span></label>
+        <input id="ballSlider" type="range" min="8" max="100" value="36">
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Skins</label>
+        <div id="skins">
+          <div class="skin-option" data-skin="skin-default">Default</div>
+          <div class="skin-option" data-skin="skin-gold">Gold</div>
+          <div class="skin-option" data-skin="skin-disco">Disco</div>
+          <div class="skin-option" data-skin="skin-steel">Steel</div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Powerups</label>
+        <div class="controls">
+          <button id="growBtn" class="btn-ghost">🍌 Grow (5s)</button>
+          <button id="shrinkBtn" class="btn-ghost">🧊 Shrink (5s)</button>
+          <button id="regenBtn" class="btn-ghost">💧 Regen Stamina</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Abilities</label>
+        <div class="controls">
+          <button id="whipBtn" class="ability">🥊 Whip</button>
+          <button id="rigidBtn" class="ability">🛡️ Rigid Bridge</button>
+          <button id="slapBtn" class="ability">👋 Ball Slap</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Stats & Progress</label>
+        <div class="stats">
+          <div>
+            <div class="muted">Length</div>
+            <div class="meter"><i id="statLength" style="width:40%"></i></div>
+          </div>
+          <div>
+            <div class="muted">Girth</div>
+            <div class="meter"><i id="statGirth" style="width:25%"></i></div>
+          </div>
+          <div>
+            <div class="muted">Stamina</div>
+            <div class="meter"><i id="statStamina" style="width:100%"></i></div>
+          </div>
+          <div>
+            <div class="muted">Confidence</div>
+            <div class="meter"><i id="statConfidence" style="width:10%"></i></div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px" class="flex">
+          <button id="saveBtn" class="btn">Save</button>
+          <button id="loadBtn" class="btn-ghost">Load</button>
+          <button id="resetBtn" class="btn-ghost">Reset</button>
+        </div>
+        <div class="small muted" style="margin-top:8px">XP increases confidence; using powerups costs stamina. Level up grants +stat points.</div>
+      </div>
+    </aside>
+
+    <footer>Prototype — keep it comedic, not pornographic. No minors. </footer>
+  </div>
+
+<script>
+/* Genitalia RPG Prototype
+   - single-file browser prototype
+   - adult checkbox enables controls
+   - drag to move, sliders modify size, buttons for powerups/abilities
+   - basic stats, xp, save/load
+*/
+(() => {
+  // DOM
+  const ageConfirm = document.getElementById('ageConfirm');
+  const lengthSlider = document.getElementById('lengthSlider');
+  const girthSlider = document.getElementById('girthSlider');
+  const ballSlider = document.getElementById('ballSlider');
+  const lenVal = document.getElementById('lenVal');
+  const girthVal = document.getElementById('girthVal');
+  const ballVal = document.getElementById('ballVal');
+  const dick = document.getElementById('dick');
+  const shaft = document.getElementById('shaft');
+  const head = document.getElementById('head');
+  const leftBall = document.getElementById('leftBall');
+  const rightBall = document.getElementById('rightBall');
+  const viewport = document.getElementById('viewport');
+  const growBtn = document.getElementById('growBtn');
+  const shrinkBtn = document.getElementById('shrinkBtn');
+  const regenBtn = document.getElementById('regenBtn');
+  const whipBtn = document.getElementById('whipBtn');
+  const rigidBtn = document.getElementById('rigidBtn');
+  const slapBtn = document.getElementById('slapBtn');
+  const skins = document.getElementById('skins');
+  const toast = document.getElementById('toast');
+  const saveBtn = document.getElementById('saveBtn'), loadBtn = document.getElementById('loadBtn'), resetBtn = document.getElementById('resetBtn');
+
+  // stats DOM
+  const statLength = document.getElementById('statLength');
+  const statGirth = document.getElementById('statGirth');
+  const statStamina = document.getElementById('statStamina');
+  const statConfidence = document.getElementById('statConfidence');
+
+  // state
+  const state = {
+    enabled: false,
+    pos: { x: 120, y: 120 },
+    dragging: false,
+    dragOffset: { x:0,y:0 },
+    skin: 'skin-default',
+    abilities: { whip:false, rigid:false, slap:false },
+    powerups: { grow: {active:false, expires:0}, shrink:{active:false,expires:0} },
+    stats:{
+      length: lengthSlider.value, // px
+      girth: girthSlider.value,   // px
+      balls: ballSlider.value,    // px
+      stamina: 100,
+      confidence: 10,
+      xp: 0,
+      level: 1
+    },
+    lastTick: performance.now()
+  };
+
+  // helpers
+  function toastMsg(text, t=1500){
+    toast.style.display = 'block';
+    toast.textContent = text;
+    clearTimeout(toast._t);
+    toast._t = setTimeout(()=> toast.style.display = 'none', t);
+  }
+
+  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+
+  function applyVisuals(){
+    // apply size to elements
+    shaft.style.width = state.stats.girth + 'px';
+    shaft.style.height = state.stats.length + 'px';
+    head.style.width = (Math.max(16, Math.round(state.stats.girth * 1.1))) + 'px';
+    head.style.height = head.style.width;
+    head.style.marginTop = -(parseInt(head.style.height)/3) + 'px';
+    leftBall.style.width = state.stats.balls + 'px';
+    leftBall.style.height = state.stats.balls + 'px';
+    rightBall.style.width = state.stats.balls + 'px';
+    rightBall.style.height = state.stats.balls + 'px';
+
+    // position
+    dick.style.left = state.pos.x + 'px';
+    dick.style.top = state.pos.y + 'px';
+
+    // apply skin class
+    dick.className = `dick ${state.skin}` + (state.abilities.rigid ? ' rigid':'');
+
+    // whip animation toggle handled elsewhere
+  }
+
+  // UI updates for labels
+  function updateLabels(){
+    lenVal.textContent = state.stats.length + 'px';
+    girthVal.textContent = state.stats.girth + 'px';
+    ballVal.textContent = state.stats.balls + 'px';
+    // stats meters
+    statLength.style.width = clamp((state.stats.length - 80) / (360-80) * 100, 3,100) + '%';
+    statGirth.style.width = clamp((state.stats.girth - 20) / (140-20) * 100, 3,100) + '%';
+    statStamina.style.width = clamp(state.stats.stamina,0,100) + '%';
+    statConfidence.style.width = clamp(state.stats.confidence,0,100) + '%';
+  }
+
+  // save/load
+  function saveState(){
+    const s = {
+      skin: state.skin,
+      stats: state.stats,
+      pos: state.pos
+    };
+    localStorage.setItem('genrpg_save_v1', JSON.stringify(s));
+    toastMsg('Saved');
+  }
+  function loadState(){
+    const raw = localStorage.getItem('genrpg_save_v1');
+    if(!raw) return toastMsg('No save found',1200);
+    try{
+      const s = JSON.parse(raw);
+      state.skin = s.skin || state.skin;
+      state.stats = {...state.stats, ...s.stats};
+      state.pos = s.pos || state.pos;
+      lengthSlider.value = state.stats.length;
+      girthSlider.value = state.stats.girth;
+      ballSlider.value = state.stats.balls;
+      updateLabels();
+      applyVisuals();
+      toastMsg('Loaded');
+    }catch(e){ toastMsg('Failed to load',1200) }
+  }
+  function resetAll(){
+    state.skin = 'skin-default';
+    state.stats = { length:160, girth:40, balls:36, stamina:100, confidence:10, xp:0, level:1 };
+    state.pos = { x:120, y:120 };
+    lengthSlider.value = state.stats.length;
+    girthSlider.value = state.stats.girth;
+    ballSlider.value = state.stats.balls;
+    updateLabels(); applyVisuals();
+    toastMsg('Reset');
+  }
+
+  // powerup logic
+  function startPowerup(name, seconds){
+    if(!state.enabled) return toastMsg('Confirm 18+ to use powerups');
+    const p = state.powerups[name];
+    p.active = true;
+    p.expires = performance.now() + seconds*1000;
+    if(name === 'grow'){
+      // increase sizes by a multiplier (visual + stat effect)
+      state.stats.length = Math.round(state.stats.length * 1.45);
+      state.stats.girth = Math.round(state.stats.girth * 1.35);
+      state.stats.balls = Math.round(state.stats.balls * 1.25);
+      toastMsg('GROW activated');
+      state.stats.stamina = clamp(state.stats.stamina - 12, 0, 100);
+    } else if(name === 'shrink'){
+      state.stats.length = Math.round(state.stats.length * 0.65);
+      state.stats.girth = Math.round(state.stats.girth * 0.7);
+      state.stats.balls = Math.round(state.stats.balls * 0.7);
+      toastMsg('SHRINK activated');
+      state.stats.stamina = clamp(state.stats.stamina - 6, 0, 100);
+    }
+    applyVisuals(); updateLabels();
+  }
+  function endPowerup(name){
+    const p = state.powerups[name];
+    if(!p.active) return;
+    p.active = false;
+    // revert sizes by simply clamping sliders to current and letting player adjust — for prototype we'll not auto revert massively
+    toastMsg(`${name} expired`,900);
+  }
+
+  // Abilities
+  function useWhip(){
+    if(!state.enabled) return toastMsg('Confirm 18+ first.');
+    if(state.stats.stamina < 8) return toastMsg('Too tired for whip');
+    // whip animation: quick swing via css transform
+    if(state.abilities.whip) return toastMsg('Whip already active');
+    state.abilities.whip = true;
+    state.stats.stamina -= 8;
+    toastMsg('Whip! Smack!');
+    const el = shaft;
+    el.style.transition = 'transform 0.06s ease';
+    let swings = 0;
+    const swing = () => {
+      if(swings++ > 8){ el.style.transform = ''; state.abilities.whip=false; return; }
+      el.style.transform = `rotate(${(Math.random()>.5?1:-1)*(10 + Math.random()*30)}deg) translateX(${(Math.random()>.5?1:-1)*6}px)`;
+      setTimeout(()=> { el.style.transform=''; setTimeout(swing, 80) }, 80);
+    };
+    swing();
+    updateLabels();
+  }
+
+  function toggleRigid(){
+    if(!state.enabled) return toastMsg('Confirm 18+ first.');
+    if(state.abilities.rigid){
+      state.abilities.rigid = false;
+      toastMsg('Rigid off');
+    } else {
+      if(state.stats.stamina < 14) return toastMsg('Too tired to become rigid');
+      state.abilities.rigid = true;
+      state.stats.stamina -= 14;
+      toastMsg('Rigid on — be a bridge');
+      // small visual stiffen handled by class
+    }
+    applyVisuals(); updateLabels();
+  }
+
+  function useSlap(){
+    if(!state.enabled) return toastMsg('Confirm 18+ first.');
+    if(state.stats.stamina < 6) return toastMsg('Too tired for slap');
+    state.stats.stamina -= 6;
+    toastMsg('Ball Slap!');
+    // jiggle balls
+    [leftBall,rightBall].forEach((b, i) => {
+      b.animate([
+        { transform: 'translateY(0) rotate(0)' },
+        { transform: `translateY(${(i?1:-1)*8}px) rotate(${(i?1:-1)*12}deg)` },
+        { transform: 'translateY(0) rotate(0)' }
+      ], { duration: 360, easing:'cubic-bezier(.3,.9,.15,1)' });
+    });
+    // small XP gain
+    gainXP(4);
+    updateLabels();
+  }
+
+  // XP & leveling
+  function gainXP(amount){
+    state.stats.xp += amount;
+    const need = 20 + state.stats.level*10;
+    if(state.stats.xp >= need){
+      state.stats.xp -= need;
+      state.stats.level += 1;
+      state.stats.confidence = clamp(state.stats.confidence + 6, 0, 100);
+      toastMsg('Level up! Confidence +6',1400);
+    }
+  }
+
+  // regen stamina
+  function regenStamina(){
+    if(!state.enabled) return toastMsg('Confirm 18+ first.');
+    state.stats.stamina = clamp(state.stats.stamina + 28, 0, 100);
+    toastMsg('Stamina regenerated');
+    gainXP(2);
+    updateLabels();
+  }
+
+  // dragging
+  viewport.addEventListener('pointerdown', (e) => {
+    if(!state.enabled) { toastMsg('Check the 18+ box to enable editing'); return; }
+    const rect = viewport.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const dickRect = dick.getBoundingClientRect();
+    const localX = mx - (dickRect.left - rect.left);
+    const localY = my - (dickRect.top - rect.top);
+    // simplistic proximity: click anywhere within dick bounding box
+    if(localX >= -40 && localX <= dickRect.width + 40 && localY >= -40 && localY <= dickRect.height + 40){
+      state.dragging = true;
+      state.dragOffset.x = mx - state.pos.x;
+      state.dragOffset.y = my - state.pos.y;
+    }
+  });
+  window.addEventListener('pointermove', (e) => {
+    if(!state.dragging) return;
+    const rect = viewport.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    state.pos.x = clamp(mx - state.dragOffset.x, 6, rect.width - 80);
+    state.pos.y = clamp(my - state.dragOffset.y, 6, rect.height - 80);
+    applyVisuals();
+  });
+  window.addEventListener('pointerup', () => state.dragging = false);
+
+  // sliders
+  lengthSlider.addEventListener('input', ()=> {
+    if(!state.enabled) { lengthSlider.value = state.stats.length; return toastMsg('Confirm 18+'); }
+    state.stats.length = parseInt(lengthSlider.value);
+    updateLabels(); applyVisuals();
+  });
+  girthSlider.addEventListener('input', ()=> {
+    if(!state.enabled) { girthSlider.value = state.stats.girth; return toastMsg('Confirm 18+'); }
+    state.stats.girth = parseInt(girthSlider.value);
+    updateLabels(); applyVisuals();
+  });
+  ballSlider.addEventListener('input', ()=> {
+    if(!state.enabled) { ballSlider.value = state.stats.balls; return toastMsg('Confirm 18+'); }
+    state.stats.balls = parseInt(ballSlider.value);
+    updateLabels(); applyVisuals();
+  });
+
+  // skins
+  skins.addEventListener('click', (e) => {
+    const s = e.target.getAttribute('data-skin');
+    if(!s) return;
+    state.skin = s;
+    applyVisuals();
+    toastMsg('Skin changed');
+  });
+
+  // powerups & abilities wiring
+  growBtn.addEventListener('click', ()=> startPowerup('grow', 5));
+  shrinkBtn.addEventListener('click', ()=> startPowerup('shrink', 5));
+  regenBtn.addEventListener('click', regenStamina);
+  whipBtn.addEventListener('click', useWhip);
+  rigidBtn.addEventListener('click', toggleRigid);
+  slapBtn.addEventListener('click', useSlap);
+
+  saveBtn.addEventListener('click', saveState);
+  loadBtn.addEventListener('click', loadState);
+  resetBtn.addEventListener('click', resetAll);
+
+  // age confirm
+  ageConfirm.addEventListener('change', ()=> {
+    state.enabled = ageConfirm.checked;
+    toastMsg(state.enabled ? 'Controls enabled' : 'Controls disabled');
+  });
+
+  // tick loop: manage powerup expiration, passive regen, xp, minor jiggle if heavy
+  function tick(now){
+    const dt = (now - state.lastTick)/1000;
+    state.lastTick = now;
+
+    // powerup expiration
+    Object.keys(state.powerups).forEach(k => {
+      const p = state.powerups[k];
+      if(p.active && performance.now() > p.expires){
+        p.active = false;
+        // small revert: scale back slowly to slider defaults (for prototype, nudge toward slider values)
+        state.stats.length = Math.round( (state.stats.length * 0.85) + (parseInt(lengthSlider.value)*0.15) );
+        state.stats.girth = Math.round( (state.stats.girth * 0.88) + (parseInt(girthSlider.value)*0.12) );
+        state.stats.balls = Math.round( (state.stats.balls * 0.9) + (parseInt(ballSlider.value)*0.1) );
+        toastMsg(`${k} expired`,900);
+      }
+    });
+
+    // passive stamina regen when idle
+    if(!state.dragging && !state.abilities.whip && !state.abilities.rigid){
+      state.stats.stamina = clamp(state.stats.stamina + dt*3, 0, 100);
+    }
+
+    // heavy objects cause subtle bounce/jiggle to show mass
+    const massFactor = (state.stats.length*state.stats.girth + state.stats.balls*state.stats.balls*1.5) / 1000;
+    if(massFactor > 12){
+      // gentle downward pull
+      const sway = Math.sin(now/300)*massFactor*0.3;
+      shaft.style.transform = `translateY(${sway}px)`;
+    } else {
+      shaft.style.transform = '';
+    }
+
+    // autosave xp small increments for actions
+    // (no keyboard actions in prototype). update visuals
+    updateLabels();
+    requestAnimationFrame(tick);
+  }
+
+  // initial setup
+  function init(){
+    // load any saved UI settings (not stats)
+    applyVisuals();
+    updateLabels();
+    state.lastTick = performance.now();
+    requestAnimationFrame(tick);
+    toastMsg('Prototype ready — check 18+ box to start');
+  }
+  init();
+
+  // expose for debugging (console)
+  window.__GENRPG = { state, saveState, loadState, resetAll, startPowerup, useWhip, toggleRigid, useSlap };
+})();
+</script>
+</body>
+</html>
