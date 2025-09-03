@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Just The Dick — HTML5 Mini</title>
+<style>
+  :root{
+    --bg:#0f0f12;
+    --panel:#111215;
+    --accent:#ff6584;
+    --muted:#9aa0a6;
+    --glass: rgba(255,255,255,0.03);
+  }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+  body{background:linear-gradient(180deg,#0b0b0d 0%, #111215 60%);color:#e6e9ee;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;}
+  .wrap{width:100%;max-width:1100px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; padding:18px; display:grid; grid-template-columns: 1fr 360px; gap:18px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);}
+  header{grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; gap:12px;}
+  h1{font-size:18px;margin:0;color:var(--accent);}
+  small{color:var(--muted);}
+  canvas{background: linear-gradient(180deg,#07111a 0%, #051017 100%); border-radius:8px; width:100%; height:600px; display:block; touch-action:none;}
+  .panel{background:var(--panel); padding:12px; border-radius:10px; min-height:200px;}
+  label{display:block;font-size:13px;margin-bottom:6px;color:var(--muted);}
+  .row{display:flex;gap:8px;align-items:center;margin-bottom:10px;}
+  input[type="range"]{width:100%;}
+  .btn{background:var(--accent); color:#0b0b0d; border:none; padding:8px 10px; border-radius:8px; cursor:pointer; font-weight:600;}
+  .muted{color:var(--muted); font-size:13px;}
+  .stats{display:flex;flex-direction:column;gap:6px;margin-top:8px;font-size:13px}
+  footer{grid-column:1/-1; text-align:right; font-size:12px; color:var(--muted); margin-top:6px;}
+  .danger{color:#ff7b7b}
+  .toggle{display:flex;align-items:center;gap:8px}
+  .kbd{background:var(--glass);padding:6px 8px;border-radius:6px;font-weight:600}
+  .thin{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+  <div class="wrap" role="application" aria-label="Just the Dick game UI">
+    <header>
+      <div>
+        <h1>Just The Dick</h1>
+        <div class="thin">control the size. solve the door. regret immediately.</div>
+      </div>
+      <div class="thin">Controls: <span class="kbd">← →</span> move · <span class="kbd">Space</span> jump · drag with mouse/touch</div>
+    </header>
+
+    <main>
+      <canvas id="game" width="800" height="600"></canvas>
+      <footer><small class="muted">Stylized, non-photoreal. Keep it funny, not pornographic.</small></footer>
+    </main>
+
+    <aside class="panel">
+      <div class="toggle">
+        <input id="adult" type="checkbox"/>
+        <label for="adult" class="muted">I confirm I am 18+ (required)</label>
+      </div>
+
+      <div style="margin-top:10px">
+        <label>Size slider <span id="sizeVal" class="muted">100%</span></label>
+        <input id="size" type="range" min="20" max="200" value="100">
+        <div class="muted thin" style="margin-top:6px">Scale affects length & girth. Too big = heavy & may get stuck.</div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Mode</label>
+        <div class="row">
+          <button class="btn" id="presetSmall">Small</button>
+          <button class="btn" id="presetMed">Default</button>
+          <button class="btn" id="presetBig">Giganta</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Try a door</label>
+        <div class="row">
+          <button id="spawnDoor" class="btn">Spawn Door</button>
+          <button id="resetBtn" class="btn" style="background:#8b8f94;color:#fff">Reset</button>
+        </div>
+        <div class="muted thin" style="margin-top:6px">If the shaft width exceeds the door gap, it becomes stuck (physics freeze).</div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Stats</label>
+        <div class="stats">
+          <div>Mass: <span id="mass">—</span></div>
+          <div>Speed: <span id="spd">—</span></div>
+          <div>Collision: <span id="coll">—</span></div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Tips</label>
+        <ul class="muted thin" style="margin:6px 0 0 16px;padding:0;line-height:1.5">
+          <li>Smaller = jump higher & move faster.</li>
+          <li>Bigger = heavier, slower, may break the door (or not).</li>
+          <li>Drag the object directly (mouse/touch) to reposition.</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+
+<script>
+/*
+  Just The Dick — simple 2D canvas mini.
+  - Friendly-ish physics
+  - Slider controls length & girth
+  - Door collision check (gap vs width)
+  - Age toggle required to enable controls
+*/
+
+/* -------------------- Setup -------------------- */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W = canvas.width, H = canvas.height;
+
+const sizeInput = document.getElementById('size');
+const sizeVal = document.getElementById('sizeVal');
+const adultToggle = document.getElementById('adult');
+const presetSmall = document.getElementById('presetSmall');
+const presetMed = document.getElementById('presetMed');
+const presetBig = document.getElementById('presetBig');
+const spawnDoorBtn = document.getElementById('spawnDoor');
+const resetBtn = document.getElementById('resetBtn');
+const massEl = document.getElementById('mass');
+const spdEl = document.getElementById('spd');
+const collEl = document.getElementById('coll');
+
+function fitCanvas(){
+  // make canvas responsive but keep internal resolution
+  const rect = canvas.getBoundingClientRect();
+  W = canvas.width = Math.floor(rect.width);
+  H = canvas.height = Math.floor(rect.height);
+}
+window.addEventListener('resize', fitCanvas);
+fitCanvas();
+
+/* -------------------- Game state -------------------- */
+let state = {
+  enabled: false,
+  pos: { x: W*0.25, y: H*0.6 },
+  vel: { x: 0, y: 0 },
+  onGround: true,
+  dragging: false,
+  door: null, // {x,y,w,h,gap}
+  stuck: false
+};
+
+const base = {
+  lengthPx: 140,    // default shaft length
+  girthPx: 38,      // default shaft width
+  headRadius: 26,
+  speedBase: 180,
+  jumpBase: 320,
+  gravityBase: 900
+};
+
+function sizeToScale(sizePercent){
+  // sizePercent: 20..200 -> scale factor
+  return sizePercent / 100;
+}
+
+function computePhysicals(sizePercent){
+  // mass approx area (length * girth)
+  const scale = sizeToScale(sizePercent);
+  const length = base.lengthPx * scale;
+  const girth = base.girthPx * scale;
+  const head = base.headRadius * scale;
+  const area = Math.max(1, length * girth + Math.PI*head*head);
+  // mass factor normalised
+  const mass = area / (base.lengthPx * base.girthPx);
+  const gravity = base.gravityBase * mass;
+  const speed = base.speedBase / Math.sqrt(mass);
+  const jump = base.jumpBase / Math.sqrt(mass);
+  return { scale, length, girth, head, mass, gravity, speed, jump };
+}
+
+/* -------------------- Controls -------------------- */
+let keys = { left:false, right:false, jump:false };
+window.addEventListener('keydown', e => {
+  if(e.key === 'ArrowLeft') keys.left = true;
+  if(e.key === 'ArrowRight') keys.right = true;
+  if(e.code === 'Space') keys.jump = true;
+});
+window.addEventListener('keyup', e => {
+  if(e.key === 'ArrowLeft') keys.left = false;
+  if(e.key === 'ArrowRight') keys.right = false;
+  if(e.code === 'Space') keys.jump = false;
+});
+
+// Dragging (mouse + touch)
+canvas.addEventListener('pointerdown', (e)=>{
+  if(!state.enabled) return;
+  const r = canvas.getBoundingClientRect();
+  const mx = e.clientX - r.left;
+  const my = e.clientY - r.top;
+  // simple proximity check to the "object"
+  const phys = computePhysicals(Number(sizeInput.value));
+  const objRect = { x: state.pos.x - phys.girth/2, y: state.pos.y - phys.head - phys.length, w: phys.girth, h: phys.head + phys.length + 4 };
+  if(mx >= objRect.x - 30 && mx <= objRect.x + objRect.w + 30 && my >= objRect.y - 30 && my <= objRect.y + objRect.h + 30){
+    state.dragging = true;
+    state.dragOffset = { x: mx - state.pos.x, y: my - state.pos.y };
+  }
+});
+window.addEventListener('pointermove', (e)=>{
+  if(!state.enabled || !state.dragging) return;
+  const r = canvas.getBoundingClientRect();
+  const mx = e.clientX - r.left;
+  const my = e.clientY - r.top;
+  state.pos.x = Math.max(40, Math.min(W-40, mx - state.dragOffset.x));
+  state.pos.y = Math.max(60, Math.min(H-40, my - state.dragOffset.y));
+  state.vel.x = 0; state.vel.y = 0;
+});
+window.addEventListener('pointerup', ()=> state.dragging = false);
+
+/* -------------------- UI wiring -------------------- */
+sizeInput.addEventListener('input', ()=> {
+  sizeVal.textContent = `${Math.round(sizeInput.value)}%`;
+  updateStats();
+});
+adultToggle.addEventListener('change', ()=> {
+  state.enabled = adultToggle.checked;
+});
+presetSmall.addEventListener('click', ()=> { sizeInput.value = 40; sizeVal.textContent = '40%'; updateStats(); });
+presetMed.addEventListener('click', ()=> { sizeInput.value = 100; sizeVal.textContent = '100%'; updateStats(); });
+presetBig.addEventListener('click', ()=> { sizeInput.value = 180; sizeVal.textContent = '180%'; updateStats(); });
+
+spawnDoorBtn.addEventListener('click', () => {
+  if(!state.enabled) return alert("Check the 18+ box first, horny.");
+  // spawn door near center-right
+  const x = Math.floor(W * 0.65);
+  const y = Math.floor(H * 0.55);
+  const doorHeight = 160;
+  // gap between posts (randomized)
+  const gap = Math.floor(40 + Math.random()*120);
+  state.door = { x, y, w: 18, h: doorHeight, gap };
+  state.stuck = false;
+});
+resetBtn.addEventListener('click', ()=>{
+  state.pos = { x: W*0.25, y: H*0.6 };
+  state.vel = { x:0, y:0 };
+  state.door = null;
+  state.stuck = false;
+});
+
+/* -------------------- Physics & Game Loop -------------------- */
+let last = performance.now();
+function update(dt){
+  if(!state.enabled) return;
+  // clamp dt
+  if(dt > 0.05) dt = 0.05;
+  const phys = computePhysicals(Number(sizeInput.value));
+  // horizontal movement from keys
+  if(!state.stuck && !state.dragging){
+    const input = (keys.right?1:0) - (keys.left?1:0);
+    state.vel.x += input * phys.speed * dt * 2; // acceleration
+    // friction
+    state.vel.x *= state.onGround ? 0.88 : 0.995;
+  } else {
+    state.vel.x *= 0.5;
+  }
+
+  // jump
+  if(keys.jump && state.onGround && !state.stuck && !state.dragging){
+    state.vel.y = -phys.jump;
+    state.onGround = false;
+  }
+
+  // gravity
+  state.vel.y += phys.gravity * dt;
+
+  // integrate
+  state.pos.x += state.vel.x * dt;
+  state.pos.y += state.vel.y * dt;
+
+  // ground collision
+  const groundY = H - 40;
+  const bottomY = state.pos.y + phys.head; // approximate bottom (head at bottom)
+  if(bottomY >= groundY){
+    state.pos.y = groundY - phys.head;
+    state.vel.y = 0;
+    state.onGround = true;
+  } else {
+    state.onGround = false;
+  }
+
+  // bounds
+  state.pos.x = Math.max(20, Math.min(W-20, state.pos.x));
+
+  // door interactions
+  if(state.door && !state.stuck){
+    // door is two vertical posts with gap
+    // compute horizontal overlap with the posts: if center x of shaft inside posts, check width vs gap
+    const leftPostX = state.door.x - 80;
+    const rightPostX = state.door.x + 80;
+    const centerX = state.pos.x;
+    const halfWidth = phys.girth/2;
+    // if horizontally between posts
+    if(centerX > leftPostX && centerX < rightPostX){
+      const gap = state.door.gap;
+      if(phys.girth > gap){
+        // stuck!
+        state.stuck = true;
+        state.vel.x = 0;
+        state.vel.y = 0;
+      } else {
+        // pass through: nudge forward slightly
+        state.pos.x += (state.vel.x > 0) ? 2 : -2;
+      }
+    }
+  }
+
+  // slight camera bounds fix if stuck on edge
+  if(state.pos.x <= 20) state.vel.x = Math.max(state.vel.x, 0);
+
+  // small damping
+  state.vel.x *= 0.999;
+
+  updateStats();
+}
+
+/* -------------------- Rendering -------------------- */
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  // background vignette
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'rgba(0,0,0,0.15)');
+  g.addColorStop(1,'rgba(0,0,0,0.6)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,H);
+
+  // ground
+  ctx.fillStyle = '#071720';
+  ctx.fillRect(0, H-48, W, 48);
+
+  // door if any
+  if(state.door){
+    const d = state.door;
+    // left post
+    ctx.fillStyle = '#2b2f33';
+    ctx.fillRect(d.x - 80 - d.w/2, d.y - d.h/2, d.w, d.h);
+    // right post
+    ctx.fillRect(d.x + 80 - d.w/2, d.y - d.h/2, d.w, d.h);
+    // top beam
+    ctx.fillRect(d.x - 84, d.y - d.h/2 - 12, 168, 12);
+    // gap label
+    ctx.fillStyle = '#9aa0a6';
+    ctx.font = '12px Inter,Arial';
+    ctx.fillText(`Gap: ${d.gap}px`, d.x - 22, d.y - d.h/2 - 18);
+  }
+
+  // draw the stylized Dick
+  const phys = computePhysicals(Number(sizeInput.value));
+  const x = state.pos.x;
+  const y = state.pos.y;
+
+  // shadow
+  ctx.beginPath();
+  ctx.ellipse(x + 10, y + phys.length + phys.head + 6, phys.girth*0.85, phys.girth*0.32, 0, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fill();
+
+  // shaft (rounded rectangle approximated by path)
+  ctx.save();
+  const shaftTopX = x - phys.girth/2;
+  const shaftTopY = y - phys.length;
+  const shaftW = phys.girth;
+  const shaftH = phys.length;
+
+  // draw shaft with gradient
+  const grad = ctx.createLinearGradient(x, shaftTopY, x, y + phys.head);
+  grad.addColorStop(0, '#ffb7c9');
+  grad.addColorStop(0.6, '#ff8aa8');
+  grad.addColorStop(1, '#ff6a86');
+  ctx.fillStyle = grad;
+
+  roundRect(ctx, shaftTopX, shaftTopY, shaftW, shaftH, phys.girth/2);
+  ctx.fill();
+
+  // head (circle)
+  ctx.beginPath();
+  ctx.ellipse(x, y, phys.head, phys.head*0.85, 0, 0, Math.PI*2);
+  ctx.fillStyle = '#ff8ea6';
+  ctx.fill();
+
+  // subtle highlight
+  ctx.beginPath();
+  ctx.ellipse(x - phys.head*0.25, y - phys.head*0.25, phys.head*0.25, phys.head*0.12, 0, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.fill();
+
+  ctx.restore();
+
+  // HUD: stuck message
+  if(state.stuck){
+    ctx.fillStyle = 'rgba(255,120,120,0.95)';
+    ctx.font = 'bold 18px Inter, Arial';
+    ctx.fillText('STUCK — too big for the gap', 18, 36);
+  }
+
+  // draw bounding box for interaction (for debugging)
+  // ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  // ctx.strokeRect(10,10,W-20,H-20);
+}
+
+/* rounded rectangle helper */
+function roundRect(ctx,x,y,w,h,r){
+  const radius = Math.min(r, w/2, h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+radius, y);
+  ctx.arcTo(x+w, y, x+w, y+h, radius);
+  ctx.arcTo(x+w, y+h, x, y+h, radius);
+  ctx.arcTo(x, y+h, x, y, radius);
+  ctx.arcTo(x, y, x+w, y, radius);
+  ctx.closePath();
+}
+
+/* -------------------- Stats & loop -------------------- */
+function updateStats(){
+  const phys = computePhysicals(Number(sizeInput.value));
+  massEl.textContent = phys.mass.toFixed(2);
+  spdEl.textContent = Math.round(phys.speed);
+  collEl.textContent = state.door ? (state.stuck ? 'Stuck' : 'Clear') : 'No door';
+}
+
+function loop(now){
+  const dt = (now - last)/1000;
+  last = now;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+updateStats();
+requestAnimationFrame(loop);
+
+/* -------------------- polishing: responsive canvas sizing -------------------- */
+(function ensureCanvasResizes(){
+  // Make canvas look good on different sizes: set CSS height to 600px while allowing width to fluid
+  function adapt(){
+    const container = canvas.parentElement;
+    const rect = container.getBoundingClientRect();
+    // set canvas CSS height proportionally (clamped)
+    const cssH = Math.max(360, Math.min(700, window.innerHeight*0.65));
+    canvas.style.height = cssH + 'px';
+    fitCanvas();
+  }
+  window.addEventListener('resize', adapt);
+  adapt();
+})();
+</script>
+</body>
+</html>
